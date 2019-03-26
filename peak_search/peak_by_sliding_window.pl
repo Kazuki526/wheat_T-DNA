@@ -24,7 +24,7 @@ exit;
 
 sub main( $ ){
 		my $sample = $_[0];
-		my ($in_file,$out_file) = ("$sample/$sample.bam","$sample/$sample"."_allpeak.tsv");
+		my ($in_file,$out_file) = ("$sample/$sample.bam","$sample/$sample"."_allpeak.tsv.gz");
 		open(IN,"samtools depth $in_file|");
 		open(OUT,"|gzip -c >$out_file");
 		print OUT "chr\tstart\tend\tdepth\taverage_depth\n";
