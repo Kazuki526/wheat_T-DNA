@@ -23,18 +23,27 @@ open(OUT,">all_peak_table_tidy.tsv");
 #GFP
 foreach my $num(@sample_num){
 		my $sample_id ="GFP-$num";
-		&main($sample_id);
+		my $bam = "$sample_id/$sample_id.bam";
+		open(COV,"samtools bedcov $bed $bam|");
+		while(<COV>){
+				print OUT "$sample_id\t$_";
+		}
 		print "done $sample_id\n";
 }
 #mCherry
 foreach my $num(@sample_num){
 		my $sample_id ="mCherry-$num";
-		&main($sample_id);
+		my $bam = "$sample_id/$sample_id.bam";
+		open(COV,"samtools bedcov $bed $bam|");
+		while(<COV>){
+				print OUT "$sample_id\t$_";
+		}
 		print "done $sample_id\n";
 }
 close OUT;
 exit;
 
+### doing by samtools depth
 sub main($){
 		my $sample =$_[0];
 		my $bam="$sample/$sample.bam";
