@@ -28,6 +28,7 @@ foreach my $num(@sample_num){
 		while(<COV>){
 				print OUT "$sample_id\t$_";
 		}
+		close COV;
 		print "done $sample_id\n";
 }
 #mCherry
@@ -38,6 +39,7 @@ foreach my $num(@sample_num){
 		while(<COV>){
 				print OUT "$sample_id\t$_";
 		}
+		close COV;
 		print "done $sample_id\n";
 }
 close OUT;
