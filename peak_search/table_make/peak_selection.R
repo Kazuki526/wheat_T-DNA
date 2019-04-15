@@ -38,9 +38,10 @@ peak_tbl_with_p=all_peak_tbl %>>%
   ungroup()%>>%group_by(chr,start,end,max_sample,second_sample)%>>%
   nest() %>>%
   mutate(out = purrr::map(data, ~test_max_value(.))) %>>%
-  select(-data)%>>%unnest()
+  select(-data)%>>%unnest()%>>%
+  arrange(max_p)
 
-peak_tbl_with_p %>>%arrange(max_p)%>>%
+peak_tbl_with_p %>>%
   write_df("all_peak_table_with_p.tsv")
 ######################################################################
 #sampleごとの偏り
@@ -75,8 +76,83 @@ depth_by_chr = all_peak_tbl %>>%
 ggsave("peak_coverage_by_chr.pdf",gridExtra::marrangeGrob(depth_by_chr$plot,nrow = 4,ncol=1),width =8,height=12)
 
 
+###################################################################################################
+# paired endがplasmidに張り付いているreadだけでdepthカウント
+pair_tbl=read_tsv("paired_plasmid_table_tidy.tsv",
+                      col_names = c("sample","chr","start","end","coverage")) %>>%
+  mutate(length=end-start) %>>%
+  mutate(average_depth = coverage/length, start=start+1) %>>%
+  dplyr::select(-coverage,-length)
 
+#peak regionないでmax average depthのsampleはpeak_tbl_with_pでも同じ？
+peak_tbl_with_p %>>%dplyr::select(chr,start,end,max_sample)%>>%
+  inner_join(pair_tbl%>>%
+              filter(average_depth>10)%>>%
+              group_by(chr,start,end)%>>%
+              filter(average_depth == max(average_depth)))%>>%
+  filter(max_sample != sample) 
+#問題なし！
 
+#同じpeakで２番目に高い平均depthは？
+second_pari = pair_tbl%>>%filter(average_depth>0) %>>%
+  group_by(chr,start,end)%>>%
+  arrange(desc(average_depth)) %>>%
+  filter(average_depth==average_depth[2])
+#そこそこ高いやつもある、、、、
+#これらはpeak_tbl_with_pでsecond_sampleになっている？
+peak_tbl_with_p %>>%dplyr::select(chr,start,end,max_sample,second_sample)%>>%
+  inner_join(second_pari)%>>%arrange(desc)
+#peak_tbl_with_pと同じ順番でtable作成
+pair_tbl_arranged = peak_tbl_with_p %>>%
+  select(chr,start,end,max_sample,second_sample)%>>%
+  left_join(pair_tbl %>>%
+              group_by(chr,start,end)%>>%
+              arrange(desc(average_depth)) %>>%
+              mutate(max_sample_pairedend=sample[1],second_sample_pairedend=sample[2],
+                     max_depth=average_depth[1],second_depth=average_depth[2])%>>%
+              spread(key = sample, value=average_depth))
+write_df(pair_tbl_arranged,"all_peak_table_paired_end_plasmid.tsv")
+
+#127行目より下には、、？
+pair_tbl_arranged %>>%dplyr::slice(128:3831)%>>%
+  filter(max_depth>10)
+
+#############
+#chimeric alignmentでも同じことを！
+chimer_tbl=read_tsv("chimeric_align_talbe_tidy.tsv",
+                  col_names = c("sample","chr","start","end","coverage")) %>>%
+  mutate(length=end-start) %>>%
+  mutate(average_depth = coverage/length, start=start+1) %>>%
+  dplyr::select(-coverage,-length)
+
+#peak regionないでmax average depthのsampleはpeak_tbl_with_pでも同じ？
+peak_tbl_with_p %>>%dplyr::select(chr,start,end,max_sample)%>>%
+  inner_join(chimer_tbl%>>%
+               filter(average_depth>10)%>>%
+               group_by(chr,start,end)%>>%
+               filter(average_depth == max(average_depth)))%>>%
+  filter(max_sample != sample) 
+#問題なし！
+
+#同じpeakで２番目に高い平均depthは？
+second_chimer = pair_tbl%>>%filter(average_depth>0) %>>%
+  group_by(chr,start,end)%>>%
+  arrange(desc(average_depth)) %>>%
+  filter(average_depth==average_depth[2])
+#そこそこ高いやつもある、、、、
+#これらはpeak_tbl_with_pでsecond_sampleになっている？
+peak_tbl_with_p %>>%dplyr::select(chr,start,end,max_sample,second_sample)%>>%
+  inner_join(second_chimer)%>>%View
+#peak_tbl_with_pと同じ順番でtable作成
+chimer_tbl_arranged = peak_tbl_with_p %>>%
+  select(chr,start,end,max_sample,second_sample)%>>%
+  left_join(chimer_tbl %>>%
+              group_by(chr,start,end)%>>%
+              arrange(desc(average_depth)) %>>%
+              mutate(max_sample_chimeric=sample[1],second_sample_chimeric=sample[2],
+                     max_depth=average_depth[1],second_depth=average_depth[2])%>>%
+              spread(key = sample, value=average_depth))
+write_df(chimer_tbl_arranged,"all_peak_table_chimeric_align_plasmid.tsv")
 
 
 
