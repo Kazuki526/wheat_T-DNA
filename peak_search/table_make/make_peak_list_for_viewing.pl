@@ -87,7 +87,7 @@ foreach my $chr(sort keys%for_peak_arrange){
 						print OUT "$peak_tbl{$region}{paired_second_s}:$peak_tbl{$region}{paired_second_d}\t";
 				}else{print OUT "NA\t";}
 				if($peak_tbl{$region}{chim_second_s} ne ""){
-						print OUT "$peak_tbl{$region}{chim_second_s}:$peak_tbl{$region}{chim_second_d}\n";
+						print OUT "$peak_tbl{$region}{chim_second_s}:$peak_tbl{$region}{chim_second_d}\t";
 				}else{print OUT "NA\t";}
 				if(defined $peak_tbl{$region}{homo}){
 						print OUT "$peak_tbl{$region}{homo}\n";
