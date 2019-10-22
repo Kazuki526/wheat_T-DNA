@@ -3,9 +3,8 @@ use warnings;
 use strict;
 
 my $pwd =`pwd`;chomp $pwd;
-if($pwd ne "/Volumes/kazcancer/T-DNA_search/HN00100341_hdd1"){die "ERROR:working on wrong dir\n";}
-my $genome_file = "../genome/all.fa";
--e $genome_file or die "ERROR::not exist $genome_file\n";
+#if($pwd ne "/Volumes/kazcancer/T-DNA_search/HN00100341_hdd1"){die "ERROR:working on wrong dir\n";}
+if($pwd ne "/Users/kaz/Dropbox/cooperative/plant_gen/T-DNA/forPCR"){die "ERROR:working on wrong dir\n";}
 
 my $fasta = "PCR_primer/all_primer_homologous_removed/all_primer_homologous_removed_region.fasta";
 my $masked = "PCR_primer/all_primer_homologous_removed/all_primer_homologous_removed_region.fasta.masked";
@@ -96,7 +95,8 @@ foreach my $primer_id(sort keys %primer_comp){
 								my $count = $out =~ tr/\n/\n/;
 								print TBL "$primer_comp{$primer_id}{peak_id}\t$primer_id\t\t$Nfreq\t$count\n"
 						}else{ #have some homolog
-								my @blast_covered = split(/;/,$blast{$primer_id}{self});
+								my @blast_covered =();
+								if(defined $blast{$primer_id}{self}){@blast_covered=split(/;/,$blast{$primer_id}{self});}
 								my $align_file="PCR_primer/covered_align/$primer_id.manual_align.fasta";
 								if(!-e $align_file){$align_file="PCR_primer/covered_align/$primer_id.align.fasta";}
 								my %specific_mutation = &pick_specific_mutation($primer_id,$align_file);
@@ -190,10 +190,10 @@ sub pick_specific_mutation ( $ ){
 				}else{
 						my($dif_n,$indel_n) = &check_dif($primer_id,$posi-1,\%align_fasta);
 						if($indel_n ==$homolog_num){
-								my $indel_length =1;
-								while($indel_n !=$homolog_num){
-										($dif_n,$indel_n)=&check_dif($primer_id,$posi-1+$indel_length,\%align_fasta);
+								my $indel_length =0;
+								while($indel_n ==$homolog_num){
 										$indel_length++;
+										($dif_n,$indel_n)=&check_dif($primer_id,$posi-1+$indel_length,\%align_fasta);
 								}
 								print INDEL "$primer_id\t$posi\t$nucl_posi\t$indel_length\n";
 								$specific_mutation{$nucl_posi}{seq}=substr($align_fasta{$primer_id}{seq},$posi,$indel_length);
