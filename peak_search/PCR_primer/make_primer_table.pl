@@ -3,8 +3,9 @@ use warnings;
 use strict;
 
 my $pwd =`pwd`;chomp $pwd;
-#if($pwd ne "/Volumes/kazcancer/T-DNA_search/HN00100341_hdd1"){die "ERROR:working on wrong dir\n";}
-if($pwd ne "/Users/kaz/Dropbox/cooperative/plant_gen/T-DNA/forPCR"){die "ERROR:working on wrong dir\n";}
+if($pwd ne "/Volumes/kazcancer/T-DNA_search/HN00100341_hdd1"){die "ERROR:working on wrong dir\n";}
+my $genome_file = "../genome/all.fa";
+-e $genome_file or die "ERROR::not exist $genome_file\n";
 
 my $fasta = "PCR_primer/all_primer_homologous_removed/all_primer_homologous_removed_region.fasta";
 my $masked = "PCR_primer/all_primer_homologous_removed/all_primer_homologous_removed_region.fasta.masked";
@@ -65,11 +66,11 @@ mkdir $primer_dir;
 open(TBL,">$primer_dir/all_peak_primer_info.tsv");
 print TBL "peak_id\tprimer_id\tcomment\tN(repeat)_freq\tblast_hit_n\tprimer_number\n";
 open(TWO,">$primer_dir/two-sided_peak_primer.tsv");
-print TWO "peak_id\tprimer_id\tchr\tstart_posi\tend_posi\tlength\tstrand\tseq\tread_mutation\tread_mutation_from_refference\n";
+print TWO "peak_id\tprimer_id\tchr\tstart_posi\tend_posi\tlength\tstrand\tseq\tspecific_mutation\tread_mutation\tread_mutation_from_refference\n";
 open(ONE,">$primer_dir/one-sided_peak_primer.tsv");
-print ONE "peak_id\tprimer_id\tchr\tstart_posi\tend_posi\tlength\tstrand\tseq\tread_mutation\tread_mutation_from_refference\n";
+print ONE "peak_id\tprimer_id\tchr\tstart_posi\tend_posi\tlength\tstrand\tseq\tspecific_mutation\tread_mutation\tread_mutation_from_refference\n";
 
-open(INDEL,">$primer_dir/indel_info.tsv");
+#open(INDEL,">$primer_dir/indel_info.tsv");
 
 foreach my $primer_id(sort keys %primer_comp){
 		if(!defined$masked{$primer_id}){
@@ -78,7 +79,7 @@ foreach my $primer_id(sort keys %primer_comp){
 				my $seq = $masked{$primer_id}{seq};
 				my $noN = $seq; $noN =~ s/N//g;
 				my $Nfreq = length($noN)/length($seq);
-				if(!defined $blast{$primer_id}){
+				if(!defined $blast{$primer_id}{self}){
 						print TBL "$primer_comp{$primer_id}{peak_id}\t$primer_id\tno_blast_hit\t$Nfreq\t0\n";
 				}else{
 						if(!defined $blast{$primer_id}{homolog}){ #no homolog
@@ -95,8 +96,7 @@ foreach my $primer_id(sort keys %primer_comp){
 								my $count = $out =~ tr/\n/\n/;
 								print TBL "$primer_comp{$primer_id}{peak_id}\t$primer_id\t\t$Nfreq\t$count\n"
 						}else{ #have some homolog
-								my @blast_covered =();
-								if(defined $blast{$primer_id}{self}){@blast_covered=split(/;/,$blast{$primer_id}{self});}
+								my @blast_covered = split(/;/,$blast{$primer_id}{self});
 								my $align_file="PCR_primer/covered_align/$primer_id.manual_align.fasta";
 								if(!-e $align_file){$align_file="PCR_primer/covered_align/$primer_id.align.fasta";}
 								my %specific_mutation = &pick_specific_mutation($primer_id,$align_file);
@@ -118,7 +118,7 @@ foreach my $primer_id(sort keys %primer_comp){
 close TBL;
 close TWO;
 close ONE;
-close INDEL;
+#close INDEL;
 
 
 
@@ -146,11 +146,17 @@ sub get_specific_primer_tbl( $ $ $ ){
 		for(my $length=19;$length<=25;$length++){
 				for(my$start=$region_start;$start<=$region_end-$length+1;$start++){
 						if($primer_comp{$primer_id}{side} eq "left"){
-								if(!defined$specific_mutation{$start}){next;}
+								if(!defined$specific_mutation{$start}){next;
+								}elsif(($specific_mutation{$start}{seq} eq "no_homolog")&&
+									   (&check_all_no_homolog($start,$start+$length-1,\%specific_mutation) != $length)){next;
+								}
 						}else{
-								if(!defined$specific_mutation{$start+$length-1}){next;}
+								if(!defined$specific_mutation{$start+$length-1}){next;
+								}elsif(($specific_mutation{$start+$length-1}{seq} eq "no_homolog")&&
+									   (&check_all_no_homolog($start,$start+$length-1,\%specific_mutation) != $length)){next;
+								}
 						}
-						my($specific,$specific_ref)=("","");
+
 						my $out_seq = substr($seq,$start-1,$length);
 						if($out_seq =~ /N/){next;}
 						my ($start_posi,$end_posi,$strand)=($primer_start+$start-1,$primer_start+$start+$length-2,"+");
@@ -164,18 +170,35 @@ sub get_specific_primer_tbl( $ $ $ ){
 						for(my $i=0;$i<scalar(@read_mutation);$i++){
 								if($read_mutation[$i] =~ /^(\d+)-(\d+):(.+)$/){
 										if( (($1>=$start)&&($1<$start+$length)) || (($2>=$start)&&($2<$start+$length)) ){
-												$out_read_mut.="$1:$3;";
+												my$posi=$1-$start+1;
+												if($primer_comp{$primer_id}{side} eq "right"){$posi = $length-$posi+1;}
+												$out_read_mut.="$posi:$3;";
 												$out_read_mut_orig.="$read_mutation_orig[$i];";
 										}
 								}
 						}
+						my $specific="";
+						for(my $posi=$start;$posi<$start+$length-1;$posi++){}
+
 						$out .= "$primer_comp{$primer_id}{peak_id}\t$primer_id\t$chr\t$start_posi\t$end_posi\t$length\t$strand\t";
-						$out .= "$out_seq\t$specific\t$specific_ref\t$out_read_mut\t$out_read_mut_orig\n";
+						$out .= "$out_seq\t$specific\t$out_read_mut\t$out_read_mut_orig\n";
 				}
 		}
 		return($out);
 }
 
+#------------------------------------------------------------------------------
+sub check_all_no_homolog( $ $ $ ){
+		my($start,$end)=($_[0],$_[1]);
+		my %specific_mutation = %{$_[2]};
+		my $no_homolog_num=0;
+		for(my$posi=$start;$posi<=$end;$posi++){
+				if(defined$specific_mutation{$posi}){
+						if($specific_mutation{$posi}{seq} eq "no_homolog"){$no_homolog_num++;}
+				}
+		}
+		return($no_homolog_num);
+}
 #------------------------------------------------------------------------------
 sub pick_specific_mutation ( $ ){
 		my($primer_id,$file) = @_;
@@ -187,6 +210,8 @@ sub pick_specific_mutation ( $ ){
 		while($posi<=length($align_fasta{$primer_id}{seq})){
 				if(substr($align_fasta{$primer_id}{seq},$posi-1,1) eq "-"){
 						$posi++;
+				}elsif(substr($align_fasta{$primer_id}{seq},$posi-1,1) eq "N"){
+						$posi++;$nucl_posi++;
 				}else{
 						my($dif_n,$indel_n) = &check_dif($primer_id,$posi-1,\%align_fasta);
 						if($indel_n ==$homolog_num){
@@ -195,11 +220,14 @@ sub pick_specific_mutation ( $ ){
 										$indel_length++;
 										($dif_n,$indel_n)=&check_dif($primer_id,$posi-1+$indel_length,\%align_fasta);
 								}
-								print INDEL "$primer_id\t$posi\t$nucl_posi\t$indel_length\n";
-								$specific_mutation{$nucl_posi}{seq}=substr($align_fasta{$primer_id}{seq},$posi,$indel_length);
+#								print INDEL "$primer_id\t$posi\t$nucl_posi\t$indel_length\n";
+								if($indel_length>=20){
+										for(my$i=0;$i<$indel_length;$i++){
+												$specific_mutation{$nucl_posi+$i}{seq}="no_homolog";
+										}
+								}
 								$posi += $indel_length;
 								$nucl_posi += $indel_length;
-#####################
 						}elsif($dif_n == $homolog_num){
 								$specific_mutation{$nucl_posi}{seq}=substr($align_fasta{$primer_id}{seq},$posi,1);
 								$posi++;
@@ -221,11 +249,13 @@ sub check_dif( $ $ $){
 		my ($primer_id,$posi) = ($_[0],$_[1]);
 		my %fasta = %{$_[2]};
 		my ($primer_nuc,$dif,$indel) = (substr($fasta{$primer_id}{seq},$posi,1),0,0);
-		foreach my $id(keys %fasta){
-				if($id eq $primer_id){next;}
-				my $nuc = substr($fasta{$id}{seq},$posi,1);
-				if($primer_nuc ne $nuc){$dif++;}
-				if($nuc eq "-"){$indel++;}
+		if($primer_nuc !~ /n/i){
+				foreach my $id(keys %fasta){
+						if($id eq $primer_id){next;}
+						my $nuc = substr($fasta{$id}{seq},$posi,1);
+						if($primer_nuc ne $nuc){$dif++;}
+						if($nuc eq "-"){$indel++;}
+				}
 		}
 		return($dif,$indel);
 }
